@@ -1,0 +1,7 @@
+release: /some/place
+erlang: /some/root/file
+name: mynode
+command: sleep 10
+cookie: testcookie!
+startuptimeout: 60
+checkinterval: 30

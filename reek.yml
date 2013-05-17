@@ -1,0 +1,8 @@
+Duplication:
+  max_calls: 2
+
+LongMethod:
+  max_statements: 10
+  exclude:
+  - initialize
+  enabled: true
