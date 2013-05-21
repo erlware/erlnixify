@@ -1,0 +1,4 @@
+#!/usr/bin/env ruby
+
+require 'erlnixify'
+Erlnixify::Main.main(ARGV)
