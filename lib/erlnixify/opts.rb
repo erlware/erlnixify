@@ -8,10 +8,10 @@ module Erlnixify
   #
   class Opts
 
-    attr_reader :options
+    attr_reader :options, :opts
 
     def initialize(args)
-      opts = Slop.parse(args) do
+      @opts = Slop.parse(args) do
 
         banner = "Usage: erlnixify [options]"
 
