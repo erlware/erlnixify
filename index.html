@@ -1,0 +1,303 @@
+<!doctype html>
+<html>
+  <head>
+    <meta charset="utf-8">
+    <meta http-equiv="X-UA-Compatible" content="chrome=1">
+    <title>Erlnixify by erlware</title>
+
+    <link rel="stylesheet" href="stylesheets/styles.css">
+    <link rel="stylesheet" href="stylesheets/pygment_trac.css">
+    <meta name="viewport" content="width=device-width, initial-scale=1, user-scalable=no">
+    <!--[if lt IE 9]>
+    <script src="//html5shiv.googlecode.com/svn/trunk/html5.js"></script>
+    <![endif]-->
+  </head>
+  <body>
+    <div class="wrapper">
+      <header>
+        <h1>Erlnixify</h1>
+        <p>A system to help Erlang integrate into Unix systems (supporting things like daemontools).</p>
+
+        <p class="view"><a href="https://github.com/erlware/erlnixify">View the Project on GitHub <small>erlware/erlnixify</small></a></p>
+
+
+        <ul>
+          <li><a href="https://github.com/erlware/erlnixify/zipball/master">Download <strong>ZIP File</strong></a></li>
+          <li><a href="https://github.com/erlware/erlnixify/tarball/master">Download <strong>TAR Ball</strong></a></li>
+          <li><a href="https://github.com/erlware/erlnixify">View On <strong>GitHub</strong></a></li>
+        </ul>
+      </header>
+      <section>
+        <h1>
+<a name="erlnixify" class="anchor" href="#erlnixify"><span class="octicon octicon-link"></span></a>Erlnixify</h1>
+
+<p>Erlang has the problem that it does not integrate nicely with
+Unix-like systems. It can not be put under things like
+deamon-tools. You can't trap signals and respond appropriately,
+etc. This is a small ruby program that serves as a 'front' to an
+Erlang node. It allows a system like <code>init.d</code> or <code>daemontools</code> to
+manage Erlnixify and Erlnixify will in-turn manage the Erlang node
+using standard OTP inputs.</p>
+
+<p>For example, when Erlnixify recieves a SIGTERM signal, it will call
+<code>init:stop()</code> on the Erlang node. This allows Erlang's release handler
+to do an orderly shutdown of the Erlang Node.</p>
+
+<p>Erlnixify ensures that the Erlang node is up and running and checks
+every few seconds (a configurable value) to see if everything is
+continueing to run correctly. If those checks fail, Erlnixify will
+shut down the Erlang node and then shut itself down so that whatever
+is managing the system can restart.</p>
+
+<p>Erlnixify is designed to simply front the Erlang node. It does not
+provide restarts, log rotation, or anything like that. Those things
+are expected to be provided by the system (daemontools again).</p>
+
+<p>Erlnixify can be configured from the command line or via a config
+file. Command line configuration overrides config file
+configuration. That is, if a configuration value is provided both on
+the command line and in the config file, the value on the command line
+is the one that will be used.</p>
+
+<p>** Erlnixify is designed to manage releases. **
+** For self contained releases that do not have Erlang on the system,
+   you must include <code>erl_interface</code> **</p>
+
+<h2>
+<a name="installation" class="anchor" href="#installation"><span class="octicon octicon-link"></span></a>Installation</h2>
+
+<p>Erlnixify requires ruby 1.9. It does not work on 1.8, but may work on
+2.0+ though it has not been tested.</p>
+
+<p>Add this line to your application's Gemfile:</p>
+
+<pre><code>gem 'erlnixify'
+</code></pre>
+
+<p>And then execute:</p>
+
+<pre><code>$ bundle
+</code></pre>
+
+<p>Or install it yourself as:</p>
+
+<pre><code>$ gem install erlnixify
+</code></pre>
+
+<h2>
+<a name="usage" class="anchor" href="#usage"><span class="octicon octicon-link"></span></a>Usage</h2>
+
+<h3>
+<a name="synopsis" class="anchor" href="#synopsis"><span class="octicon octicon-link"></span></a>SYNOPSIS</h3>
+
+<p><code>erlnixify</code> [&lt;optional&gt;...] &lt;flags&gt;</p>
+
+<h3>
+<a name="example" class="anchor" href="#example"><span class="octicon octicon-link"></span></a>EXAMPLE</h3>
+
+<p>The following example shows how to run a bare non-otp erlang
+module. This is <em>not</em> the recommended way to do this at all. You
+should be using Erlang releases, however it does work and it does
+illustrate the point.</p>
+
+<pre><code>erlnixify --name example \
+          --cookie fubachu \
+          --command "erl -setcookie %{cookie} -name %{fullname} -noshell -s my_module start"
+</code></pre>
+
+<p>The above is enough to get things going with the default
+values. Running a release might be a bit more complicated. Its more
+complicated because you are going to want to provide a custom check
+commands and perhaps custom check intervals.</p>
+
+<pre><code>erlnixify --name example2 \
+          --cookiefile /etc/example2/mycookiefile \
+          --release /opt/example2 \
+          --command '/opt/example2/bin/example2 -setcookie %{cookie} -name=%{fullname} +Ktrue +B -noinput -shutdown_time 5000 +W w' \
+          --check "example2 check_status" \
+          --checkregex '^ok$' \
+          --checkinterval 100
+</code></pre>
+
+<p>The above assumes we have a viable OTP Release in the /opt/example2
+directory. We have placed our cookie in a file in
+/etc/example2/mycookiefile and we have a script to start our release
+that lives in the bin directory of the release. We have provided a
+module <code>example2</code> with a function <code>check_status</code> that takes no
+arguments to check the status of the system. If it returns an <code>ok</code>
+everything is good. We are also going to run that check command every
+100 seconds.</p>
+
+<p>We could, of course, have put all the above in a config file as well.</p>
+
+<pre><code>name: example2
+cookiefile: /etc/example2/mycookiefile
+release: /opt/example2
+command: /opt/example2/bin/example2 -setcookie %{cookie} -name=%{fullname} +Ktrue +B -noinput -shutdown_time 5000 +W w
+check: example2 check_status
+checkregex: ^ok$
+checkinterval: 100
+</code></pre>
+
+<p>Then our Erlnixify could have been much simpler. Assuming our config
+file was at <code>/etc/example2/erlnixify-config.yaml</code> or Erlnixify command
+line could have been.</p>
+
+<pre><code>erlnixify --configfile /etc/example2/erlnixify-config
+</code></pre>
+
+<h3>
+<a name="options" class="anchor" href="#options"><span class="octicon octicon-link"></span></a>Options</h3>
+
+<ul>
+<li>
+<p><code>-b</code>, <code>--release</code>=&lt;release-root&gt;</p>
+
+<p>The root directory of the Release that Erlnixify is
+managing. Erlnixify expects to always be managing a release. This
+is optional if the <code>erlang</code> option is provided.</p>
+</li>
+<li>
+<p><code>-b</code>, <code>--erlang</code>=&lt;erlang-root&gt;</p>
+
+<p>The erlang root directory for the system. This only needs to be
+used if both the <code>release</code> option is not specified and the erlang
+install is in a strange place.</p>
+</li>
+<li>
+<p><code>-o</code>, <code>--home</code>=&lt;home-dir&gt;</p>
+
+<p>The home directory that should be set for the running system. This
+is set by default to the <code>HOME</code> directory of the user running
+erlnixify. However, in instances where that should be different or
+the user has no <code>HOME</code> directory, this option can be provided.</p>
+</li>
+<li>
+<p><code>-n</code>, <code>--name</code>=&lt;short node name&gt;</p>
+
+<p>The short node name for this system. This is not
+optional. Erlnixify uses distributed erlang to manage and control
+the Erlang system.</p>
+</li>
+<li>
+<p><code>--fullnode</code>=&lt;full node name&gt;</p>
+
+<p>When only <code>name</code> is provided, Erlnixify takes the host name of the
+system as provided by <code>hostname -f</code> and concatinates it with the
+value provided in <code>name</code> to come up with a fully qualified host
+name. The user can use this to override that full name.</p>
+</li>
+<li>
+<p><code>-m</code>, <code>--command</code>=&lt;node start command&gt;</p>
+
+<p>This is the command that should be used to start the node. This command may contain variables that will be filled out by the Erlnixify system. Those variables are any one of the following.</p>
+
+<ul>
+<li>
+<code>release</code> - as described adove</li>
+<li>
+<code>erlang</code> - as described above</li>
+<li>
+<code>home</code> - as described above</li>
+<li>
+<code>name</code> - as described above</li>
+<li>
+<code>fullname</code> - The full name of the Erlang node, either as provided
+or as discovered by Erlnixify. This value will always be populated</li>
+<li>
+<code>cookie</code> - The cookie provided. This value will always be populated</li>
+<li>
+<code>startuptimeout</code> - as described belov</li>
+<li>
+<code>checkinterval</code> - as described below</li>
+<li>
+<code>checktimeout</code> - as described below</li>
+</ul>
+</li>
+<li>
+<p><code>-k</code>, <code>check</code>=&lt; the command used to check the status of the system&gt;</p>
+
+<p>This is an erlang module/function call in
+<a href="http://www.erlang.org/doc/man/erl_call.html">erl_call</a> format. The
+default value for this command is <code>erlang statistics
+[reductions]</code>. However, that is not tremendously useful and you
+really should provide your own.</p>
+
+<ul>
+<li>
+<code>-r</code>, <code>--checkregex</code>=&lt;regular expression&gt;</li>
+</ul>
+<p>This is a regular expression that is used to check the output of the
+above mentioned check command. If this regular expression does not
+match the output of the check command then the command is expected
+to have failed and the node will be shut down. By default this value
+is <code>^{\\d+, \\d+}$</code>. This matches the default <code>check</code> command. If
+you change the <code>check</code> command (and you should) you must change this
+value to match your expected output otherwise the system will always
+fail on the first check.</p>
+</li>
+<li>
+<p><code>-x</code>, <code>--cookiefile</code>=&lt;path to file that contains the cookie&gt;</p>
+
+<p>If the <code>cookie</code> option is set this option is not needed. This should
+point to a file that contains the cookie that the system should
+use. That file must contain only the cookie. Be careful that you do
+not include a trailing newline.</p>
+</li>
+<li>
+<p><code>-i</code>, <code>--cookie</code>=&lt;cookie value&gt;</p>
+
+<p>The actual value that Erlnixify should use as a cookie. This isn't
+needed if the <code>cookiefile</code> option is provided.</p>
+</li>
+<li>
+<p><code>-t</code>, <code>--startuptimeout</code>=&lt;seconds that the node has to startup&gt;</p>
+
+<p>This is the number of seconds that the node has to startup. If the
+node is not running in that amount of time Erlnixify will shut it
+down and exit. The default value is 60.</p>
+</li>
+<li>
+<p><code>-a</code>, <code>--checkinterval</code>=&lt;seconds between each check&gt;</p>
+
+<p>The number of seconds between each check. The default value is 30.</p>
+</li>
+<li>
+<p><code>-w</code>, <code>--checktimeout</code>=&lt;seconds that the check command is allowed to run&gt;</p>
+
+<p>This is the number of seconds that the check command is allowed to
+run. If the check command takes longer then this number of seconds
+then Erlnixify will kill the Erlang node and exit.</p>
+</li>
+<li>
+<p><code>-c</code>, <code>--config</code>=&lt;path to config file&gt;</p>
+
+<p>The path to a <a href="http://yaml.org">YAML</a> based config file. The keys
+are the same as described here for the long version of the
+options. A config file is optional if the command line options are
+set instead.</p>
+</li>
+<li>
+<p><code>-v</code>, <code>--version</code></p>
+
+<p>Print out the version of Erlnixify</p>
+</li>
+<li>
+<p><code>-h</code>, <code>--help</code></p>
+
+<p>Print out the help for erlnixify</p>
+</li>
+</ul><h2>
+<a name="contributing" class="anchor" href="#contributing"><span class="octicon octicon-link"></span></a>Contributing</h2>
+
+<p>See <a href="https://github.com/erlware/erlnixify/blob/master/CONTRIBUTING.md">Contributing</a>&lt;</p>
+      </section>
+      <footer>
+        <p>This project is maintained by <a href="https://github.com/erlware">erlware</a></p>
+        <p><small>Hosted on GitHub Pages &mdash; Theme by <a href="https://github.com/orderedlist">orderedlist</a></small></p>
+      </footer>
+    </div>
+    <script src="javascripts/scale.fix.js"></script>
+    
+  </body>
+</html>
